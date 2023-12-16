@@ -5,12 +5,12 @@
  *
  */
 
-#include "raylib.h"
+#include <raylib.h>
 
 #define RAYGUI_IMPLEMENTATION
-#include "raygui.h"
+#include "headers/raygui.h"
 
-#include "style_dark.h"
+#include "headers/style_dark.h"
 
 // CONFIG //
 #define OPEN_ON_START true
