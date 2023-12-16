@@ -27,7 +27,6 @@ static void savebutton();                // Button: save button logic
 static void newbutton();                // Button: new button logic
 static void openbutton();                // Button: open button logic
 static void themebutton();              // Button: theme button logic
-static void aboutbutton();              // Button: About button logic
 // ----CONTROL RECTANGLES && VARIABLES---- //
     Rectangle layoutRecs[7] = {
         
@@ -222,12 +221,4 @@ static void themebutton(){
     }
 }
 
-//TODO
-static void aboutbutton(){
-    InitWindow(100, 100, "About NoteBox");
-    while (!WindowShouldClose()){
-        ClearBackground(RAYWHITE);
-        DrawText("NoteBox 1.0", 0,0, 20, BLACK);
-    }
-    CloseWindow();
-}
+
