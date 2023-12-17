@@ -13,9 +13,9 @@
 #include "headers/style_dark.h"
 
 // CONFIG //
-#define OPEN_ON_START true
+#define OPEN_ON_START false
 #define SAVE_ON_CLOSE true
-#define REMOVE_DONE_ON_SAVE true
+#define REMOVE_DONE_ON_SAVE false
 int theme=0;
 
 
@@ -27,6 +27,26 @@ static void savebutton();                // Button: save button logic
 static void newbutton();                // Button: new button logic
 static void openbutton();                // Button: open button logic
 static void themebutton();              // Button: theme button logic
+static void removebutton(int x);
+
+//----remove lib function----//
+void removeElementFromArray(int *arr, int *size, int index) {
+    if (index < 0 || index >= *size) {
+        // Index out of bounds
+        return;
+    }
+
+    // Shift elements to fill the gap
+    for (int i = index; i < *size - 1; ++i) {
+        arr[i] = arr[i + 1];
+    }
+
+    // Decrease the size of the array
+    (*size)--;
+}
+
+
+
 // ----CONTROL RECTANGLES && VARIABLES---- //
     Rectangle layoutRecs[7] = {
         
@@ -43,6 +63,11 @@ static void themebutton();              // Button: theme button logic
     Rectangle checkmarks[100] = {
         (Rectangle){ 0, 32, 24, 24 },    // CheckBoxEx: checkbox
         (Rectangle){ 0, 64, 24, 24 },    // CheckBoxEx: checkbox2
+    };
+    
+    Rectangle removes[100] = {
+        (Rectangle){375, 32, 24, 24},
+        (Rectangle){375, 64, 24, 24},
     };
     char notesContent[100][128] = {
         "",
@@ -68,7 +93,7 @@ int main()
     //---------------------------------------------------------------------------------------
     int screenWidth = 800;
     int screenHeight = 450;
-    char version[]="1.0";
+    char version[]="1.1";
     char name[]="NoteBox";
     InitWindow(screenWidth, screenHeight, name);
 
@@ -107,16 +132,16 @@ int main()
             for (int i=0; i<screenHeight/32; i++){
                 if (GuiTextBox(notes[i], notesContent[i], 128, notesState[i])) notesState[i] = !notesState[i];
                 if (GuiCheckBox(checkmarks[i], NULL, &checked[i]));
+                if (GuiButton(removes[i], "x")) removebutton(i);
             }
-            //----------------------------------------------------------------------------------
-            //----Draw About box----/
+            //----Draw About box----//
             if (about){
                 if (GuiWindowBox((Rectangle){screenWidth/2-144,screenHeight/2-100, 288, 200}, TextFormat("About %s", name))){
                     about=false;
                 }
                 DrawText(TextFormat("%s v. %s", name, version), screenWidth/2-144+MeasureText(TextFormat("%s v. %s", name, version), 20)/2, screenHeight/2-70, 20, BLUE);
-                DrawText("Developed by MrVollbart, (c) 2023", screenWidth/2-140, screenHeight/2-50, 10, GRAY);
-                DrawText("Licensed under the GNU GPL license.", screenWidth/2-140, screenHeight/2+85, 10, GRAY);
+                DrawText("Developed by MrVollbart, (c) 2023", screenWidth/2-140, screenHeight/2-50, 10, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)));
+                DrawText("Licensed under the GNU GPL license.", screenWidth/2-140, screenHeight/2+85, 10, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)));
             }
         EndDrawing();
         //----------------------------------------------------------------------------------
@@ -125,11 +150,12 @@ int main()
     // De-Initialization
     //--------------------------------------------------------------------------------------
     CloseWindow();        // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
+    
     
     if (SAVE_ON_CLOSE){
         savebutton();
     }
+    //--------------------------------------------------------------------------------------
     return 0;
 }
 
@@ -139,7 +165,7 @@ int main()
 // Button: savebutton logic
 static void savebutton()
 {
-    // TODO: Implement control logic
+    // concatonate everything in save format to save string //
     char toSave[1000]="";
     for (int i=0; i<=boxes; i++){
         if (checked[i] && !REMOVE_DONE_ON_SAVE){
@@ -160,25 +186,25 @@ static void savebutton()
     printf("Saved: \n%s\n", toSave);
     SaveFileText("save.txt", toSave);
 }
-// Button: Button002 logic
+// New item button //
 static void newbutton()
 {
-    // TODO: Implement control logic
+    // create new item //
     boxes++;
     notes[boxes] = (Rectangle){ 32, 32*boxes+32, 336, 24 };
     checkmarks[boxes] = (Rectangle){ 0, 32*boxes+32, 24, 24 };
-    //notesContent[boxes];
     notesState[boxes] = false;
     checked[boxes] = false;
+    removes[boxes] = (Rectangle){375, 32*boxes+32, 24, 24};
 }
-// Button: Button006 logic
+// Open button logic
 static void openbutton()
 {
-    // TODO: Implement control logic
+    // read file if it exists //
     if (FileExists("save.txt")){
         char* scanned=LoadFileText("save.txt");
         printf("Text: %s",scanned);
-        //tokenize
+        //tokenize at newline character//
         char tokens[100][128];
         char* token;
         token=strtok(scanned, "\n");
@@ -190,11 +216,12 @@ static void openbutton()
             i++;
         }
         int readLines=i;
-// write data //
+// write data until EOF is reached//
         for (int i=0; i<=readLines && strcmp(tokens[i], "EOF"); i++){
             notes[i] = (Rectangle){ 32, 32*i+32, 336, 24 };
             notesState[i] = false;
             checkmarks[i] = (Rectangle){ 0, 32*i+32, 24, 24 };
+            removes[i] = (Rectangle){375, 32*i+32, 24, 24};
             printf("%s\n", tokens[i]);
             
             if (tokens[i][0]=='x'){
@@ -211,6 +238,7 @@ static void openbutton()
     
 }
 
+//----switch theme----//
 static void themebutton(){
     if (theme==0){
         GuiLoadStyleDark();
@@ -221,4 +249,30 @@ static void themebutton(){
     }
 }
 
+//----Remove items from list----//
+static void removebutton(int x){
+    // remove item //
+    notes[x]=(Rectangle){0,0,0,0};
+    strcpy(notesContent[x], "");
+    notesState[x]=false;
+    checkmarks[x]=(Rectangle){0,0,0,0};
+    removes[x]=(Rectangle){0,0,0,0};
 
+    // move items one foreward //
+    for (int i=x+1; i<=boxes+1; i++){
+        notes[i-1] = (Rectangle){ 32, 32*(i-1)+32, 336, 24 };
+        checkmarks[i-1] = (Rectangle){ 0, 32*(i-1)+32, 24, 24 };
+        removes[i-1] = (Rectangle){375, 32*(i-1)+32, 24, 24};
+        strcpy(notesContent[i-1], notesContent[i]);
+        checked[i-1]=checked[i];
+
+        
+    }
+    // remove last item (duplicate) //
+    notes[boxes]=(Rectangle){0,0,0,0};
+    checkmarks[boxes]=(Rectangle){0,0,0,0};
+    removes[boxes]=(Rectangle){0,0,0,0};
+    strcpy(notesContent[boxes], "");
+    checked[boxes]=false;
+    boxes--;
+}
