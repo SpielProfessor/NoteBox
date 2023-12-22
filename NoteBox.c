@@ -6,7 +6,7 @@
  */
 
 #include <raylib.h>
-
+#include<math.h>
 #define RAYGUI_IMPLEMENTATION
 #include "headers/raygui.h"
 
@@ -16,6 +16,7 @@
 #define OPEN_ON_START true
 #define SAVE_ON_CLOSE true
 #define REMOVE_DONE_ON_SAVE false
+#define USE_CONFIG_FILE true
 int theme=0;
 
 
@@ -68,7 +69,13 @@ static void removebutton(int x);
     };
 
 int boxes=1;
-
+void updateTheme(){
+    if (theme==1){
+                GuiLoadStyleDark();
+            } else if (theme==0) {
+                GuiLoadStyleDefault();
+            }
+}
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
@@ -78,12 +85,22 @@ int main()
     //---------------------------------------------------------------------------------------
     int screenWidth = 800;
     int screenHeight = 450;
-    char version[]="1.1b";
+    char version[]="1.2";
     char name[]="NoteBox";
+    
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, name);
     SetWindowIcon(LoadImage("resources/icon-png.png"));
+    
     if (OPEN_ON_START){
         openbutton();
+    }
+    if (USE_CONFIG_FILE && FileExists("config.txt")){
+        char* text=LoadFileText("config.txt");
+        
+        theme=text[0]-'0';
+        updateTheme();
+        printf("Loaded: %s\n", text);
     }
     bool about=false;
     SetTargetFPS(60);
@@ -94,7 +111,8 @@ int main()
     {
         // Update
         //----------------------------------------------------------------------------------
-        // TODO: Implement required update logic
+        screenWidth=GetScreenWidth();
+        screenHeight=GetScreenHeight();
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -114,7 +132,7 @@ int main()
     if (GuiButton(layoutRecs[4], "About")) {if (about) {about=false;} else {about=true;}}
             
             //----Draw notes----//
-            for (int i=0; i<screenHeight/32; i++){
+            for (int i=0; i<=boxes; i++){
                 if (GuiTextBox(notes[i], notesContent[i], 128, notesState[i])) notesState[i] = !notesState[i];
                 if (GuiCheckBox(checkmarks[i], NULL, &checked[i]));
                 if (GuiButton(removes[i], "x")) removebutton(i);
@@ -174,13 +192,15 @@ static void savebutton()
 // New item button //
 static void newbutton()
 {
-    // create new item //
-    boxes++;
-    notes[boxes] = (Rectangle){ 32, 32*boxes+32, 336, 24 };
-    checkmarks[boxes] = (Rectangle){ 0, 32*boxes+32, 24, 24 };
-    notesState[boxes] = false;
-    checked[boxes] = false;
-    removes[boxes] = (Rectangle){375, 32*boxes+32, 24, 24};
+    if (boxes<(GetScreenHeight()-32)/32-1){
+        // create new item //
+        boxes++;
+        notes[boxes] = (Rectangle){ 32, 32*boxes+32, 336, 24 };
+        checkmarks[boxes] = (Rectangle){ 0, 32*boxes+32, 24, 24 };
+        notesState[boxes] = false;
+        checked[boxes] = false;
+        removes[boxes] = (Rectangle){375, 32*boxes+32, 24, 24};
+    }
 }
 // Open button logic
 static void openbutton()
@@ -226,12 +246,16 @@ static void openbutton()
 //----switch theme----//
 static void themebutton(){
     if (theme==0){
-        GuiLoadStyleDark();
+        
         theme=1;
     } else if (theme==1) {
-        GuiLoadStyleDefault();
+        
         theme=0;
     }
+    if (USE_CONFIG_FILE){
+        SaveFileText("config.txt", (char*)TextFormat("%d\n", theme));
+    }
+    updateTheme();
 }
 
 //----Remove items from list----//
