@@ -1,4 +1,4 @@
-//----NoteBox 1.0----//
+//----NoteBox 1.1----//
 /*
  * Todo manager written in raylib
  *
@@ -13,7 +13,7 @@
 #include "headers/style_dark.h"
 
 // CONFIG //
-#define OPEN_ON_START false
+#define OPEN_ON_START true
 #define SAVE_ON_CLOSE true
 #define REMOVE_DONE_ON_SAVE false
 int theme=0;
@@ -29,21 +29,6 @@ static void openbutton();                // Button: open button logic
 static void themebutton();              // Button: theme button logic
 static void removebutton(int x);
 
-//----remove lib function----//
-void removeElementFromArray(int *arr, int *size, int index) {
-    if (index < 0 || index >= *size) {
-        // Index out of bounds
-        return;
-    }
-
-    // Shift elements to fill the gap
-    for (int i = index; i < *size - 1; ++i) {
-        arr[i] = arr[i + 1];
-    }
-
-    // Decrease the size of the array
-    (*size)--;
-}
 
 
 
@@ -93,10 +78,10 @@ int main()
     //---------------------------------------------------------------------------------------
     int screenWidth = 800;
     int screenHeight = 450;
-    char version[]="1.1";
+    char version[]="1.1b";
     char name[]="NoteBox";
     InitWindow(screenWidth, screenHeight, name);
-
+    SetWindowIcon(LoadImage("resources/icon-png.png"));
     if (OPEN_ON_START){
         openbutton();
     }
