@@ -6,10 +6,8 @@
  */
 
 #include <raylib.h>
-#include<math.h>
 #define RAYGUI_IMPLEMENTATION
 #include "headers/raygui.h"
-
 #include "headers/style_dark.h"
 
 // CONFIG //
