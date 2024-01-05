@@ -1,8 +1,24 @@
-//----NoteBox 1.1----//
+//----NoteBox 1.3 (PRERELEASE)----//
 /*
  * Todo manager written in raylib
  *
- *
+ * ---APP TODO---
+ * + Fix Multi-line text input
+ * + Add calendar page
+ * + Add headers for ToDos
+ * + Add a settings page
+ * + Maybe add a drag-and-drop system like Trello
+ * + Add notification system
+ * + Add more themes
+ * + Add ToDo timer and state color (Timer)
+ * + Improve file Structure: relocate library functions
+ * + Open file as dialogue
+ * + Improve UI
+ * ---Current features---
+ * Theme switcher
+ * ToDo page
+ * ToDo saving & Loading
+ * Notes page (BETA)
  */
 
 #include <raylib.h>
@@ -15,8 +31,104 @@
 #define SAVE_ON_CLOSE true
 #define REMOVE_DONE_ON_SAVE false
 #define USE_CONFIG_FILE true
-int theme=0;
 
+int theme=0;
+#define MARGIN 4
+// ----- BETA FEATURES -- MAY INCLUDE BUGS -----//
+// Enable/disable beta features //
+#define ENABLE_BETA true
+// Current mode [BETA] - change default first page. Page 0: ToDo. Page 1: Notes. Page 2: Calendar
+int mode=0;
+
+//----------------------------------------------------------------------------------
+// LIBRARY FUNCTIONS
+//----------------------------------------------------------------------------------
+// Multi-line textbox //
+/*
+* Todo: (* normal priority, ! higher priority)
+! When in other lines, the cursor doesn't follow
+* Add mouse click to change cursor pos in text
+* Add Up & Down cursor keys support
+! Add word wrap
+* Add hover effect
+*/
+bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursorPossie){
+    int cursorPos = (*cursorPossie);
+    if (interacting){
+        
+        DrawRectangleRec(bounds, GetColor(GuiGetStyle(DEFAULT, BASE_COLOR_FOCUSED)));
+        
+        DrawRectangleLines(bounds.x, bounds.y, bounds.width, bounds.height, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_FOCUSED)));
+        // text input & cursor manipulation //
+        int key = GetCharPressed();
+        if (key>0 && cursorPos==strlen(text)){
+            text[cursorPos] = (char)key;
+            text[cursorPos+1] = '\0';
+            cursorPos++;
+        } else if (key>0){
+            // insert into the string at cursorPos;
+            char goal[strlen(text)+1];
+            strncpy(goal, text, cursorPos);
+            goal[cursorPos]='\0';
+            strcat(goal, TextFormat("%c\0", (char)key));
+            strcat(goal, text+cursorPos);
+            
+            // copy string with inserted char back //
+            strcpy(text, goal);
+            cursorPos++;
+        }
+        
+        if (IsKeyPressed(KEY_LEFT) && cursorPos>0){
+            cursorPos--;
+        }
+        if (IsKeyPressed(KEY_RIGHT) && cursorPos<strlen(text)){
+            cursorPos++;
+        }
+        if (IsKeyPressed(KEY_BACKSPACE) && cursorPos==strlen(text) && cursorPos>0){
+            text[cursorPos-1]='\0';
+            cursorPos--;
+        } else if (IsKeyPressed(KEY_BACKSPACE) && cursorPos>0){
+            // If in the middle of the text
+            cursorPos--;
+            memmove(&text[cursorPos], &text[cursorPos + 1], strlen(text) - cursorPos);
+            
+        }
+        
+        
+        if (IsKeyPressed(KEY_ENTER)){
+            text[cursorPos]='\n';
+            cursorPos++;
+            
+        }
+        
+        char textEx[100];
+        strcpy(textEx, text);
+        textEx[cursorPos]='\0';
+        DrawText("|", bounds.x+5+MeasureText(textEx, 20), bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
+        DrawText(text, bounds.x+5, bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
+        // outside of textbox
+    }else{
+        DrawRectangleRec(bounds, GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
+        DrawRectangleLines(bounds.x, bounds.y, bounds.width, bounds.height, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
+        
+        DrawText(text, bounds.x+5, bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)));
+    }
+
+    
+    (*cursorPossie)=cursorPos;
+    if (CheckCollisionPointRec(GetMousePosition(), bounds)){
+        SetMouseCursor(MOUSE_CURSOR_IBEAM);
+    } else {
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+    }
+    if (CheckCollisionPointRec(GetMousePosition(), bounds) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+        return true;
+    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && interacting){
+        return true;
+    } else {
+        return false;
+    }
+}
 
 
 //----------------------------------------------------------------------------------
@@ -27,7 +139,8 @@ static void newbutton();                // Button: new button logic
 static void openbutton();                // Button: open button logic
 static void themebutton();              // Button: theme button logic
 static void removebutton(int x);
-
+void updateTheme();
+static void switchbutton();
 
 
 
@@ -38,42 +151,47 @@ static void removebutton(int x);
         (Rectangle){ 0, 0, 48, 24 },    // Button: newbutton
         (Rectangle){ 112, 0, 48, 24 },    // Button: openbutton
         (Rectangle){ 168, 0, 48, 24 }, // Button: Theme toggle
-        (Rectangle){ 224, 0, 48, 24 }  // Button: About
+        (Rectangle){ 224, 0, 48, 24 },  // Button: About
+        (Rectangle){800-50, 0, 48, 24} // Page switcher button
     };
     Rectangle notes[100] = {
-        (Rectangle){ 32, 32, 336, 24 },    // TextBox: notebox
-        (Rectangle){ 32, 64, 336, 24 },    // TextBox: notebox2
+        (Rectangle){ 24, 32, 336, 24 },    // TextBox: notebox
+        (Rectangle){ 24, 64, 336, 24 },    // TextBox: notebox2
+        (Rectangle){ 24, 96, 336, 24 },    // TextBox: notebox2
     };
     Rectangle checkmarks[100] = {
-        (Rectangle){ 0, 32, 24, 24 },    // CheckBoxEx: checkbox
-        (Rectangle){ 0, 64, 24, 24 },    // CheckBoxEx: checkbox2
+        (Rectangle){ 2, 32, 24, 24 },    // CheckBoxEx: checkbox
+        (Rectangle){ 2, 64, 24, 24 },    // CheckBoxEx: checkbox2
+        (Rectangle){ 2, 96, 24, 24 },    // CheckBoxEx: checkbox2
     };
     
     Rectangle removes[100] = {
         (Rectangle){375, 32, 24, 24},
         (Rectangle){375, 64, 24, 24},
+        (Rectangle){375, 96, 24, 24},
     };
     char notesContent[100][128] = {
-        "",
-        ""
+        "Press the New button for a new note",
+        "Press the box <- to finish a todo and press -> to remove the todo",
+        "Press the Button in the top right corner to cycle between modes"
     };
     bool notesState[100] = {
+        false,
         false,
         false
     };
     bool checked[100] = {
         false,
+        false,
         false
     };
+    int boxes=2;
+// MODE 1
+bool notesInteracting=true;
+Rectangle notesBounds={0,24,800,450};
+char notesText[100]="";
+int notesCursorPos=1;
 
-int boxes=1;
-void updateTheme(){
-    if (theme==1){
-                GuiLoadStyleDark();
-            } else if (theme==0) {
-                GuiLoadStyleDefault();
-            }
-}
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
@@ -83,7 +201,7 @@ int main()
     //---------------------------------------------------------------------------------------
     int screenWidth = 800;
     int screenHeight = 450;
-    char version[]="1.2";
+    char version[]="1.3/PRE 1b\nUnfinished Pre-Release 2";
     char name[]="NoteBox";
     
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
@@ -123,27 +241,57 @@ int main()
             //----------------------------------------------------------------------------------
             // Draw controls
             if (GuiButton(layoutRecs[1], "Save")) savebutton(); 
-            if (GuiButton(layoutRecs[2], "New")) newbutton(); 
 
             if (GuiButton(layoutRecs[0], "Open")) openbutton(); 
-            if (GuiButton(layoutRecs[3], "Theme")) themebutton(); 
-    if (GuiButton(layoutRecs[4], "About")) {if (about) {about=false;} else {about=true;}}
+            if (GuiButton(layoutRecs[2], "Theme")) themebutton(); 
+            if (GuiButton(layoutRecs[3], "About")) {if (about) {about=false;} else {about=true;}}
+            if (ENABLE_BETA){
+                if (GuiButton(layoutRecs[5], TextFormat("%d/3", mode+1))) switchbutton();
+            }
             
-            //----Draw notes----//
-            for (int i=0; i<=boxes; i++){
-                if (GuiTextBox(notes[i], notesContent[i], 128, notesState[i])) notesState[i] = !notesState[i];
-                if (GuiCheckBox(checkmarks[i], NULL, &checked[i]));
-                if (GuiButton(removes[i], "x")) removebutton(i);
+            layoutRecs[5].x=GetScreenWidth()-50;
+            
+            // Modal UIs //
+            // TODO MODE //
+            if (mode==0){
+                //----Draw todos----//
+                for (int i=0; i<=boxes; i++){
+                    notes[i].width=GetScreenWidth()-removes[i].width-checkmarks[i].width-MARGIN*4;
+                    notes[i].x=checkmarks[i].width+MARGIN*2;
+                    removes[i].x=GetScreenWidth()-removes[i].width-MARGIN;
+                    
+                    if (GuiTextBox(notes[i], notesContent[i], 128, notesState[i])) notesState[i] = !notesState[i];
+                    if (GuiCheckBox(checkmarks[i], NULL, &checked[i]));
+                    if (GuiButton(removes[i], "x")) removebutton(i);
+                    
+                }
+                if (GuiButton(layoutRecs[4], "New")) newbutton(); 
+            }
+            // TODO: NOTES MODE //
+            if (ENABLE_BETA){
+                if (mode==1){
+                    notesBounds.width=GetRenderWidth();
+                    notesBounds.height=GetScreenHeight();
+                    if(GuiTextBoxMulti(notesBounds, notesText, notesInteracting, &notesCursorPos)) notesInteracting=!notesInteracting;
+                }
+            
+            // TODO: CALENDAR MODE //
+            
+            
             }
             //----Draw About box----//
             if (about){
                 if (GuiWindowBox((Rectangle){screenWidth/2-144,screenHeight/2-100, 288, 200}, TextFormat("About %s", name))){
                     about=false;
                 }
-                DrawText(TextFormat("%s v. %s", name, version), screenWidth/2-144+MeasureText(TextFormat("%s v. %s", name, version), 20)/2, screenHeight/2-70, 20, BLUE);
-                DrawText("Developed by MrVollbart, (c) 2023", screenWidth/2-140, screenHeight/2-50, 10, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)));
+                DrawText(TextFormat("%s v. %s", name, version), screenWidth/2-MeasureText(TextFormat("%s v. %s", name, version), 20)/2, screenHeight/2-70, 20, BLUE);
+                DrawText("Developed by MrVollbart, (c) 2023-2024", screenWidth/2-140, screenHeight/2-50, 10, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)));
+                if(ENABLE_BETA) DrawText("Beta features enabled. May be unstable", screenWidth/2-140, screenHeight/2+75, 10, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)) );
+                    
                 DrawText("Licensed under the GNU GPL license.", screenWidth/2-140, screenHeight/2+85, 10, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL)));
             }
+            
+            
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
@@ -163,9 +311,18 @@ int main()
 //------------------------------------------------------------------------------------
 // Controls Functions Definitions (local)
 //------------------------------------------------------------------------------------
+// Update current theme
+void updateTheme(){
+    if (theme==1){
+                GuiLoadStyleDark();
+            } else if (theme==0) {
+                GuiLoadStyleDefault();
+            }
+}
 // Button: savebutton logic
 static void savebutton()
 {
+    // save ToDos //
     // concatonate everything in save format to save string //
     char toSave[1000]="";
     for (int i=0; i<=boxes; i++){
@@ -184,17 +341,25 @@ static void savebutton()
         
     }
     strcat(toSave, "EOF");
-    printf("Saved: \n%s\n", toSave);
-    SaveFileText("save.txt", toSave);
+    if (strcmp(toSave, "EOF")!=0){
+        SaveFileText("save.txt", toSave);
+        printf("Saved: \n%s\n", toSave);
+    }
+    if (ENABLE_BETA){
+        // Save Notes //
+        if (strlen(notesText)>0){
+            SaveFileText("notes-save.txt", notesText);
+        }
+    }
 }
-// New item button //
+// New item button logic for ToDos //
 static void newbutton()
 {
     if (boxes<(GetScreenHeight()-32)/32-1){
         // create new item //
         boxes++;
-        notes[boxes] = (Rectangle){ 32, 32*boxes+32, 336, 24 };
-        checkmarks[boxes] = (Rectangle){ 0, 32*boxes+32, 24, 24 };
+        notes[boxes] = (Rectangle){ 24+MARGIN, 32*boxes+32, 336, 24 };
+        checkmarks[boxes] = (Rectangle){ MARGIN, 32*boxes+32, 24, 24 };
         notesState[boxes] = false;
         checked[boxes] = false;
         removes[boxes] = (Rectangle){375, 32*boxes+32, 24, 24};
@@ -203,6 +368,7 @@ static void newbutton()
 // Open button logic
 static void openbutton()
 {
+    // Load ToDos //
     // read file if it exists //
     if (FileExists("save.txt")){
         char* scanned=LoadFileText("save.txt");
@@ -223,7 +389,7 @@ static void openbutton()
         for (int i=0; i<=readLines && strcmp(tokens[i], "EOF"); i++){
             notes[i] = (Rectangle){ 32, 32*i+32, 336, 24 };
             notesState[i] = false;
-            checkmarks[i] = (Rectangle){ 0, 32*i+32, 24, 24 };
+            checkmarks[i] = (Rectangle){ MARGIN, 32*i+32, 24, 24 };
             removes[i] = (Rectangle){375, 32*i+32, 24, 24};
             printf("%s\n", tokens[i]);
             
@@ -238,7 +404,12 @@ static void openbutton()
         }
 
     }
-    
+    if (ENABLE_BETA){
+        // Load Notes //
+        if (FileExists("notes-save.txt") && GetFileLength("notes-save.txt")>0){
+            strcpy(notesText, LoadFileText("notes-save.txt"));
+        }
+    }
 }
 
 //----switch theme----//
@@ -268,7 +439,7 @@ static void removebutton(int x){
     // move items one foreward //
     for (int i=x+1; i<=boxes+1; i++){
         notes[i-1] = (Rectangle){ 32, 32*(i-1)+32, 336, 24 };
-        checkmarks[i-1] = (Rectangle){ 0, 32*(i-1)+32, 24, 24 };
+        checkmarks[i-1] = (Rectangle){ MARGIN, 32*(i-1)+32, 24, 24 };
         removes[i-1] = (Rectangle){375, 32*(i-1)+32, 24, 24};
         strcpy(notesContent[i-1], notesContent[i]);
         checked[i-1]=checked[i];
@@ -283,3 +454,11 @@ static void removebutton(int x){
     checked[boxes]=false;
     boxes--;
 }
+static void switchbutton(){
+    if (mode==2){
+        mode=0;
+    } else {
+        mode++;
+    }
+}
+
