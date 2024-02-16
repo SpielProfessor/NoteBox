@@ -1,4 +1,4 @@
-//----NoteBox 1.3 (PRERELEASE)----//
+//----NoteBox 1.3b (PRERELEASE)----//
 /*
  * Todo manager written in raylib
  *
@@ -31,6 +31,7 @@
 #define SAVE_ON_CLOSE true
 #define REMOVE_DONE_ON_SAVE false
 #define USE_CONFIG_FILE true
+#define FAST_CURSOR_MOVEMENT false // speedy cursor movement in multi-line textbox, here until better textbox
 
 int theme=0;
 #define MARGIN 4
@@ -52,6 +53,9 @@ int mode=0;
 ! Add word wrap
 * Add hover effect
 */
+
+
+#define MAX_TEXT_LEN 1000
 bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursorPossie){
     int cursorPos = (*cursorPossie);
     if (interacting){
@@ -61,11 +65,11 @@ bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursor
         DrawRectangleLines(bounds.x, bounds.y, bounds.width, bounds.height, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_FOCUSED)));
         // text input & cursor manipulation //
         int key = GetCharPressed();
-        if (key>0 && cursorPos==strlen(text)){
+        if (key>0 && cursorPos==strlen(text) && strlen(text)<MAX_TEXT_LEN){
             text[cursorPos] = (char)key;
             text[cursorPos+1] = '\0';
             cursorPos++;
-        } else if (key>0){
+        } else if (key>0 && strlen(text)<MAX_TEXT_LEN){
             // insert into the string at cursorPos;
             char goal[strlen(text)+1];
             strncpy(goal, text, cursorPos);
@@ -78,16 +82,17 @@ bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursor
             cursorPos++;
         }
         
-        if (IsKeyPressed(KEY_LEFT) && cursorPos>0){
+
+        if ( ((!FAST_CURSOR_MOVEMENT && IsKeyPressed(KEY_LEFT)) || (FAST_CURSOR_MOVEMENT && IsKeyDown(KEY_LEFT))) && cursorPos>0){
             cursorPos--;
         }
-        if (IsKeyPressed(KEY_RIGHT) && cursorPos<strlen(text)){
+        if ( ((!FAST_CURSOR_MOVEMENT && IsKeyPressed(KEY_RIGHT)) || (FAST_CURSOR_MOVEMENT && IsKeyDown(KEY_RIGHT))) && cursorPos<strlen(text)){
             cursorPos++;
         }
-        if (IsKeyPressed(KEY_BACKSPACE) && cursorPos==strlen(text) && cursorPos>0){
+        if ( ((!FAST_CURSOR_MOVEMENT && IsKeyPressed(KEY_BACKSPACE)) || (FAST_CURSOR_MOVEMENT && IsKeyDown(KEY_BACKSPACE))) && cursorPos==strlen(text) && cursorPos>0){
             text[cursorPos-1]='\0';
             cursorPos--;
-        } else if (IsKeyPressed(KEY_BACKSPACE) && cursorPos>0){
+        } else if ( ((!FAST_CURSOR_MOVEMENT && IsKeyPressed(KEY_BACKSPACE)) || (FAST_CURSOR_MOVEMENT && IsKeyDown(KEY_BACKSPACE)))  && cursorPos>0){
             // If in the middle of the text
             cursorPos--;
             memmove(&text[cursorPos], &text[cursorPos + 1], strlen(text) - cursorPos);
@@ -101,10 +106,19 @@ bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursor
             
         }
         
-        char textEx[100];
+        char textEx[MAX_TEXT_LEN];
         strcpy(textEx, text);
         textEx[cursorPos]='\0';
-        DrawText("|", bounds.x+5+MeasureText(textEx, 20), bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
+
+        int nlc=0;
+        // count \n occurances in textEx: which line to put in?
+        for (int i=0; i<strlen(textEx); i++){
+          if (textEx[i]=='\n') nlc++;
+          if (textEx[i]=='\0') break;
+        }
+    // usage kinda implemented
+        
+        DrawText("|", bounds.x+5+MeasureText(textEx, 20), bounds.y+5 /*font size:*/ +15*nlc, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
         DrawText(text, bounds.x+5, bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
         // outside of textbox
     }else{
@@ -189,7 +203,7 @@ static void switchbutton();
 // MODE 1
 bool notesInteracting=true;
 Rectangle notesBounds={0,24,800,450};
-char notesText[100]="";
+char notesText[MAX_TEXT_LEN]="";
 int notesCursorPos=1;
 
 //------------------------------------------------------------------------------------
@@ -261,7 +275,7 @@ int main()
                     removes[i].x=GetScreenWidth()-removes[i].width-MARGIN;
                     
                     if (GuiTextBox(notes[i], notesContent[i], 128, notesState[i])) notesState[i] = !notesState[i];
-                    if (GuiCheckBox(checkmarks[i], NULL, &checked[i]));
+                    GuiCheckBox(checkmarks[i], NULL, &checked[i]);
                     if (GuiButton(removes[i], "x")) removebutton(i);
                     
                 }
@@ -281,7 +295,7 @@ int main()
             }
             //----Draw About box----//
             if (about){
-                if (GuiWindowBox((Rectangle){screenWidth/2-144,screenHeight/2-100, 288, 200}, TextFormat("About %s", name))){
+                if (GuiWindowBox((Rectangle){(float)screenWidth/2-144,(float)screenHeight/2-100, 288, 200}, TextFormat("About %s", name))){
                     about=false;
                 }
                 DrawText(TextFormat("%s v. %s", name, version), screenWidth/2-MeasureText(TextFormat("%s v. %s", name, version), 20)/2, screenHeight/2-70, 20, BLUE);
