@@ -1,4 +1,4 @@
-//----NoteBox 1.3b (PRERELEASE)----//
+//----NoteBox 1.3c (PRERELEASE)----//
 /*
  * Todo manager written in raylib
  *
@@ -14,6 +14,8 @@
  * + Improve file Structure: relocate library functions
  * + Open file as dialogue
  * + Improve UI
+ * + Fix crash on linux (problem with me on hyprland)
+ * + Improve multi-line textbox: KEY_DOWN & KEY_UP
  * ---Current features---
  * Theme switcher
  * ToDo page
@@ -22,6 +24,7 @@
  */
 
 #include <raylib.h>
+#include <string.h>
 #define RAYGUI_IMPLEMENTATION
 #include "headers/raygui.h"
 #include "headers/style_dark.h"
@@ -98,7 +101,7 @@ bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursor
             memmove(&text[cursorPos], &text[cursorPos + 1], strlen(text) - cursorPos);
             
         }
-        
+         
         
         if (IsKeyPressed(KEY_ENTER)){
             text[cursorPos]='\n';
@@ -109,15 +112,40 @@ bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursor
         char textEx[MAX_TEXT_LEN];
         strcpy(textEx, text);
         textEx[cursorPos]='\0';
-
+        // Newline count
         int nlc=0;
+        int i=0;
+    // next new line character
+        int nlnl=0;
+    // last and previous last newline character
+        int lnl=0;
+        int plnl=0;
         // count \n occurances in textEx: which line to put in?
-        for (int i=0; i<strlen(textEx); i++){
-          if (textEx[i]=='\n') nlc++;
+        for (; i<strlen(textEx); i++){
+          if (textEx[i]=='\n'){
+            nlc++; 
+            plnl=lnl;
+            lnl=i;
+          }
           if (textEx[i]=='\0') break;
         }
-    // usage kinda implemented
-        
+        // find next newline symbol //
+        for (; i<MAX_TEXT_LEN; i++){
+          if (textEx[i]=='\n'){
+            nlnl=i;
+            break;
+          }
+        }
+
+        memmove(textEx, textEx+lnl, strlen(textEx));
+
+        if (IsKeyPressed(KEY_DOWN)){
+          cursorPos=nlnl+1;
+        }
+        if (IsKeyPressed(KEY_UP)){
+          cursorPos=plnl+1;
+        }
+
         DrawText("|", bounds.x+5+MeasureText(textEx, 20), bounds.y+5 /*font size:*/ +15*nlc, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
         DrawText(text, bounds.x+5, bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
         // outside of textbox
@@ -201,10 +229,10 @@ static void switchbutton();
     };
     int boxes=2;
 // MODE 1
-bool notesInteracting=true;
+bool notesInteracting=false;
 Rectangle notesBounds={0,24,800,450};
 char notesText[MAX_TEXT_LEN]="";
-int notesCursorPos=1;
+int notesCursorPos=0;
 
 //------------------------------------------------------------------------------------
 // Program main entry point
@@ -215,7 +243,7 @@ int main()
     //---------------------------------------------------------------------------------------
     int screenWidth = 800;
     int screenHeight = 450;
-    char version[]="1.3/PRE 1b\nUnfinished Pre-Release 2";
+    char version[]="1.3/PRE 1c\n\nUnfinished Pre-Release 2";
     char name[]="NoteBox";
     
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
@@ -287,6 +315,7 @@ int main()
                     notesBounds.width=GetRenderWidth();
                     notesBounds.height=GetScreenHeight();
                     if(GuiTextBoxMulti(notesBounds, notesText, notesInteracting, &notesCursorPos)) notesInteracting=!notesInteracting;
+                    if(notesInteracting==false) notesCursorPos=0;
                 }
             
             // TODO: CALENDAR MODE //
