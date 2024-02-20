@@ -1,4 +1,4 @@
-//----NoteBox 1.3c (PRERELEASE)----//
+//----NoteBox 1.3c-HOTFIX (PRERELEASE)----//
 /*
  * Todo manager written in raylib
  *
@@ -145,9 +145,14 @@ bool GuiTextBoxMulti(Rectangle bounds, char* text, bool interacting, int* cursor
         if (IsKeyPressed(KEY_UP)){
           cursorPos=plnl+1;
         }
-
+        
+        #ifdef _WIN32
+        DrawText("|", bounds.x+5+MeasureText(textEx, 20), bounds.y+5 /*font size:*/ +30*nlc, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
+        #elif __unix__
         DrawText("|", bounds.x+5+MeasureText(textEx, 20), bounds.y+5 /*font size:*/ +15*nlc, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
+        #endif
         DrawText(text, bounds.x+5, bounds.y+5, 20, GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_FOCUSED)));
+        
         // outside of textbox
     }else{
         DrawRectangleRec(bounds, GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
@@ -504,4 +509,3 @@ static void switchbutton(){
         mode++;
     }
 }
-
