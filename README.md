@@ -1,3 +1,5 @@
+# Archivation note:
+NoteBox is archived due to the release of my notebox.rs, which is overall better (other than maybe performance)
 # NoteBox
 A simple todo app written in c with raylib/raygui
 
